@@ -22,11 +22,3 @@ pdm run interviewer-serve
 ```
 
 3. Open http://localhost:8000
-```
-
----
-
-**.gitignore**
-```
-.*_cache
-output/
