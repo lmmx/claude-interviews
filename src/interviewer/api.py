@@ -52,7 +52,7 @@ app = FastAPI(
 
 
 @app.get("/api/search")
-def search(q: str = Query(..., min_length=1), k: int = Query(30, ge=1, le=100)):
+def search(q: str = Query(..., min_length=1), k: int = Query(100, ge=1, le=100)):
     """
     Semantic search over interview responses.
     Returns top k results with similarity scores.
