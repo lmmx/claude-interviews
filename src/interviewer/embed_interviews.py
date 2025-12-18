@@ -80,7 +80,9 @@ def run():
     print(f"Extracted {len(df_responses)} user responses")
 
     print(f"\nRegistering model: {MODEL_ID}")
-    register_model(MODEL_ID, providers=["CUDAExecutionProvider"])
+    register_model(
+        MODEL_ID, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+    )
 
     # Create text for embedding - just use the response
     df_responses = df_responses.with_columns(

@@ -28,7 +28,9 @@ df: pl.DataFrame
 async def lifespan(app: FastAPI):
     global df
     print(f"Registering model: {MODEL_ID}")
-    register_model(MODEL_ID, providers=["CUDAExecutionProvider"])
+    register_model(
+        MODEL_ID, providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+    )
 
     parquet_path = OUTPUT_DIR / "interview_embeddings.parquet"
     if not parquet_path.exists():
@@ -86,7 +88,9 @@ def get_all_responses():
             "id": row["transcript_id"],
             "split": row["split"],
             "turn": row["turn"],
-            "preview": row["response"][:100] + "..." if len(row["response"]) > 100 else row["response"],
+            "preview": row["response"][:100] + "..."
+            if len(row["response"]) > 100
+            else row["response"],
             "x": round(row["x"], 4),
             "y": round(row["y"], 4),
         }
