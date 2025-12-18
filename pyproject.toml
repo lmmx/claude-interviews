@@ -1,0 +1,29 @@
+[build-system]
+build-backend = "pdm.backend"
+requires = ["pdm-backend"]
+
+[project]
+name = "interviewer"
+version = "0.1.0"
+description = "Explore Claude interview responses with semantic search powered by polars-fastembed"
+readme = "README.md"
+authors = [
+    { name = "Louis Maddox", email = "louismmx@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.3.5",
+    "polars-fastembed[cuda]>=0.1.10",
+    "umap-learn>=0.5.9.post2",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+]
+
+[project.scripts]
+interviewer-embed = "interviewer:run_embed"
+interviewer-serve = "interviewer:run_serve"
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.3",
+]

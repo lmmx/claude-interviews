@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interviewer Explorer - Claude Interview Responses</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 16px 24px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 20px;
+            white-space: nowrap;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            min-width: 280px;
+            max-width: 600px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 16px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            background: #161b22;
+            color: #c9d1d9;
+        }
+
+        input:focus { outline: none; border-color: #58a6ff; }
+
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            background: #238636;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        button:hover { background: #2ea043; }
+
+        .filters {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover { border-color: #58a6ff; color: #c9d1d9; }
+        .filter-btn.active { background: #388bfd; border-color: #388bfd; color: white; }
+
+        .status {
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .plot-container {
+            flex: 1;
+            position: relative;
+            border-right: 1px solid #30363d;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        #plot {
+            width: 100%;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 450px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #30363d;
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        .results {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .response-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .response-card:hover {
+            border-color: #58a6ff;
+            background: #1c2128;
+        }
+
+        .response-card.highlighted {
+            border-color: #f78166;
+            background: #2d1f1f;
+        }
+
+        .response-meta {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #21262d;
+            color: #8b949e;
+        }
+
+        .badge.workforce { background: #1f3d2a; color: #56d364; }
+        .badge.creatives { background: #3d2a1f; color: #d29922; }
+        .badge.scientists { background: #1f2a3d; color: #58a6ff; }
+
+        .score {
+            color: #58a6ff;
+            margin-left: auto;
+        }
+
+        .response-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #c9d1d9;
+            max-height: 120px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .response-text.expanded {
+            max-height: none;
+        }
+
+        .response-text::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, #161b22);
+        }
+
+        .response-text.expanded::after {
+            display: none;
+        }
+
+        .response-card:hover .response-text::after {
+            background: linear-gradient(transparent, #1c2128);
+        }
+
+        .expand-btn {
+            font-size: 11px;
+            color: #58a6ff;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: #1c2128;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 350px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            opacity: 0;
+            transition: opacity 0.15s;
+            line-height: 1.4;
+        }
+
+        .tooltip.visible { opacity: 1; }
+        .tooltip .meta { font-size: 11px; color: #8b949e; margin-bottom: 6px; }
+        .tooltip .preview { color: #c9d1d9; }
+
+        .legend {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            display: flex;
+            gap: 16px;
+            padding: 8px 12px;
+            font-size: 11px;
+            background: rgba(13, 17, 23, 0.8);
+            border-radius: 6px;
+            border: 1px solid #30363d;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.workforce { background: #56d364; }
+        .legend-dot.creatives { background: #d29922; }
+        .legend-dot.scientists { background: #58a6ff; }
+
+        footer {
+            padding: 12px 24px;
+            border-top: 1px solid #30363d;
+            font-size: 12px;
+            color: #6e7681;
+            text-align: center;
+        }
+
+        footer a { color: #58a6ff; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        @media (max-width: 900px) {
+            main { flex-direction: column; }
+            .plot-container { height: 50vh; border-right: none; border-bottom: 1px solid #30363d; }
+            .sidebar { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎙️ Interviewer Explorer</h1>
+        <div class="search-box">
+            <input type="text" id="q" placeholder="Search responses... (AI frustration, productivity, coding, trust)" autofocus />
+            <button id="btn">Search</button>
+        </div>
+        <div class="filters">
+            <button class="filter-btn active" data-split="all">All</button>
+            <button class="filter-btn" data-split="workforce">Workforce</button>
+            <button class="filter-btn" data-split="creatives">Creatives</button>
+            <button class="filter-btn" data-split="scientists">Scientists</button>
+        </div>
+        <span class="status" id="status">Loading...</span>
+    </header>
+
+    <main>
+        <div class="plot-container">
+            <svg id="plot"></svg>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot workforce"></div> Workforce</div>
+                <div class="legend-item"><div class="legend-dot creatives"></div> Creatives</div>
+                <div class="legend-item"><div class="legend-dot scientists"></div> Scientists</div>
+            </div>
+        </div>
+        <aside class="sidebar">
+            <div class="sidebar-header" id="results-header">Search results</div>
+            <div class="results" id="results"></div>
+        </aside>
+    </main>
+
+    <div class="tooltip" id="tooltip">
+        <div class="meta"></div>
+        <div class="preview"></div>
+    </div>
+
+    <footer>
+        Built with <a href="https://github.com/lmmx/polars-fastembed">polars-fastembed</a> |
+        Data: <a href="https://huggingface.co/datasets/Anthropic/AnthropicInterviewer">Anthropic/AnthropicInterviewer</a>
+    </footer>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const tooltip = $('tooltip');
+
+        let allResponses = [];
+        let searchResults = new Set();
+        let searchResultsData = [];
+        let activeSplit = 'all';
+
+        const splitColors = {
+            workforce: '#56d364',
+            creatives: '#d29922',
+            scientists: '#58a6ff'
+        };
+
+        // D3 setup
+        const svg = d3.select('#plot');
+        const container = svg.append('g');
+        const dotsGroup = container.append('g').attr('class', 'dots');
+
+        let xScale, yScale;
+        let currentTransform = d3.zoomIdentity;
+
+        // Zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([0.5, 20])
+            .on('zoom', (event) => {
+                currentTransform = event.transform;
+                container.attr('transform', event.transform);
+                updateDotSizes();
+            });
+
+        svg.call(zoom);
+
+        // Double-click to reset
+        svg.on('dblclick.zoom', null);
+        svg.on('dblclick', () => {
+            svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+        });
+
+        function debounce(fn, ms) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => fn(...args), ms);
+            };
+        }
+
+        function getFilteredResponses() {
+            if (activeSplit === 'all') return allResponses;
+            return allResponses.filter(r => r.split === activeSplit);
+        }
+
+        function updateDotSizes() {
+            const baseSize = 3;
+            const scale = currentTransform.k;
+            const size = baseSize / Math.sqrt(scale);
+            
+            dotsGroup.selectAll('circle')
+                .attr('r', d => {
+                    const key = `${d.id}-${d.turn}`;
+                    if (searchResults.size > 0 && searchResults.has(key)) {
+                        return (size * 1.5);
+                    }
+                    return size;
+                });
+        }
+
+        async function loadResponses() {
+            $('status').textContent = 'Loading responses...';
+            const res = await fetch('/api/responses');
+            allResponses = await res.json();
+
+            $('status').textContent = `${allResponses.length} responses loaded`;
+            initializeScales();
+            render();
+        }
+
+        function initializeScales() {
+            const container = document.querySelector('.plot-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            const padding = 40;
+
+            svg.attr('width', width).attr('height', height);
+
+            const xExtent = d3.extent(allResponses, d => d.x);
+            const yExtent = d3.extent(allResponses, d => d.y);
+
+            xScale = d3.scaleLinear()
+                .domain(xExtent)
+                .range([padding, width - padding]);
+
+            yScale = d3.scaleLinear()
+                .domain(yExtent)
+                .range([padding, height - padding]);
+        }
+
+        function render() {
+            const filtered = getFilteredResponses();
+            const hasSearch = searchResults.size > 0;
+
+            // Bind data
+            const dots = dotsGroup.selectAll('circle')
+                .data(filtered, d => `${d.id}-${d.turn}`);
+
+            // Remove old dots
+            dots.exit().remove();
+
+            // Add new dots
+            const dotsEnter = dots.enter()
+                .append('circle')
+                .attr('cx', d => xScale(d.x))
+                .attr('cy', d => yScale(d.y))
+                .on('mouseenter', handleMouseEnter)
+                .on('mouseleave', handleMouseLeave);
+
+            // Update all dots
+            dots.merge(dotsEnter)
+                .attr('cx', d => xScale(d.x))
+                .attr('cy', d => yScale(d.y))
+                .attr('fill', d => splitColors[d.split])
+                .attr('opacity', d => {
+                    if (!hasSearch) return 0.6;
+                    const key = `${d.id}-${d.turn}`;
+                    return searchResults.has(key) ? 1 : 0.08;
+                })
+                .attr('stroke', d => {
+                    if (!hasSearch) return 'none';
+                    const key = `${d.id}-${d.turn}`;
+                    return searchResults.has(key) ? '#fff' : 'none';
+                })
+                .attr('stroke-width', 1);
+
+            updateDotSizes();
+        }
+
+        function handleMouseEnter(event, d) {
+            tooltip.querySelector('.meta').textContent = `${d.split} · ${d.id} · turn ${d.turn}`;
+            tooltip.querySelector('.preview').textContent = d.preview;
+            tooltip.classList.add('visible');
+
+            // Highlight the dot
+            d3.select(event.target)
+                .attr('opacity', 1)
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+        }
+
+        function handleMouseLeave(event, d) {
+            tooltip.classList.remove('visible');
+
+            const hasSearch = searchResults.size > 0;
+            const key = `${d.id}-${d.turn}`;
+            const isHighlighted = hasSearch && searchResults.has(key);
+
+            d3.select(event.target)
+                .attr('opacity', hasSearch ? (isHighlighted ? 1 : 0.08) : 0.6)
+                .attr('stroke', isHighlighted ? '#fff' : 'none')
+                .attr('stroke-width', 1);
+        }
+
+        // Track mouse for tooltip positioning
+        document.addEventListener('mousemove', (e) => {
+            if (tooltip.classList.contains('visible')) {
+                tooltip.style.left = (e.clientX + 12) + 'px';
+                tooltip.style.top = (e.clientY + 12) + 'px';
+            }
+        });
+
+        async function search() {
+            const q = $('q').value.trim();
+            if (!q) {
+                searchResults.clear();
+                searchResultsData = [];
+                $('results').innerHTML = '';
+                $('results-header').textContent = 'Search results';
+                render();
+                return;
+            }
+
+            $('status').textContent = 'Searching...';
+            $('btn').disabled = true;
+
+            try {
+                const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&k=30`);
+                const results = await res.json();
+
+                searchResultsData = results;
+                searchResults = new Set(results.map(r => `${r.id}-${r.turn}`));
+
+                renderResults(results, q);
+                $('status').textContent = `${allResponses.length} responses loaded`;
+                render();
+            } catch (err) {
+                $('status').textContent = `Error: ${err.message}`;
+            }
+
+            $('btn').disabled = false;
+        }
+
+        function renderResults(results, query) {
+            const filtered = activeSplit === 'all' 
+                ? results 
+                : results.filter(r => r.split === activeSplit);
+
+            $('results').innerHTML = filtered.map(r => `
+                <div class="response-card" data-id="${r.id}" data-turn="${r.turn}">
+                    <div class="response-meta">
+                        <span class="badge ${r.split}">${r.split}</span>
+                        <span class="badge">${r.id} · turn ${r.turn}</span>
+                        <span class="score">${(r.score * 100).toFixed(0)}%</span>
+                    </div>
+                    <div class="response-text">${escapeHtml(r.response)}</div>
+                    <div class="expand-btn">Show more</div>
+                </div>
+            `).join('');
+
+            $('results-header').textContent = `"${query}" → ${filtered.length} results`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event handlers
+        $('btn').onclick = search;
+        $('q').onkeypress = e => { if (e.key === 'Enter') search(); };
+
+        $('q').oninput = debounce(() => {
+            if ($('q').value.trim() === '') {
+                searchResults.clear();
+                searchResultsData = [];
+                $('results').innerHTML = '';
+                $('results-header').textContent = 'Search results';
+                render();
+            }
+        }, 200);
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                activeSplit = btn.dataset.split;
+                
+                if (searchResultsData.length > 0) {
+                    renderResults(searchResultsData, $('q').value.trim());
+                }
+                render();
+            };
+        });
+
+        // Expand/collapse response cards
+        $('results').onclick = e => {
+            if (e.target.classList.contains('expand-btn')) {
+                const card = e.target.closest('.response-card');
+                const text = card.querySelector('.response-text');
+                text.classList.toggle('expanded');
+                e.target.textContent = text.classList.contains('expanded') ? 'Show less' : 'Show more';
+            }
+        };
+
+        // Handle window resize
+        window.addEventListener('resize', debounce(() => {
+            initializeScales();
+            render();
+            // Reapply current transform
+            svg.call(zoom.transform, currentTransform);
+        }, 200));
+
+        // Init
+        loadResponses().catch(err => {
+            $('status').textContent = `Error: ${err.message}`;
+        });
+    </script>
+</body>
+</html>
